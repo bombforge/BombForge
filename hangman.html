@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hangman - BombForge</title>
+  <style>
+    /* ========== Base ========== */
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background:#111;
+      color:#fff;
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
+
+    /* ========== Header (EXACT match to index.html) ========== */
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;  /* same as index */
+      padding:15px 20px;              /* same as index */
+      position:relative;              /* same as index for centered search */
+      width:100%;                     /* full width like index */
+    }
+
+    .logo {
+      font-size:24px;
+      font-weight:bold;
+      color:#00ffcc;
+    }
+    .logo p {
+      font-size:14px;
+      color:#aaa;
+      margin-top:2px;
+      font-weight:normal;
+    }
+
+    .search-bar {
+      position:absolute;              /* centered in header like index */
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      align-items:center;
+      background:#222;
+      border-radius:25px;
+      padding:6px 12px;
+      gap:6px;
+    }
+    .search-bar input {
+      background:transparent;
+      border:none;
+      outline:none;
+      color:#fff;
+      font-size:14px;
+      width:180px;
+    }
+    .search-bar input::placeholder { color:#777; }
+    .search-bar svg { width:18px; height:18px; fill:#aaa; }
+
+    /* ========== Game Layout ========== */
+    .game-area {
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:20px;
+      gap:14px;
+    }
+
+    h1 { font-size:24px; }
+
+    /* Canvas frame styled like your UI */
+    .canvas-wrap {
+      background:#1a1a1a;
+      border-radius:8px;
+      padding:14px;
+      box-shadow: 0 0 0 2px #222 inset;
+    }
+    canvas {
+      display:block;
+      background:#222;
+      border-radius:6px;
+    }
+
+    .word-display {
+      display:flex;
+      gap:12px;
+      margin-top:12px;
+      font-size:24px;
+      letter-spacing:2px;
+    }
+    .slot {
+      min-width:22px;
+      border-bottom:2px solid #fff;
+      text-align:center;
+      height:32px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-transform:uppercase;
+    }
+
+    /* Keyboard styled to match your rounded, bright buttons */
+    .keyboard {
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+      gap:10px;
+      max-width:600px;
+      width:100%;
+      margin-top:10px;
+    }
+    .key {
+      background:#00ffcc;
+      color:#111;
+      border:none;
+      border-radius:8px;
+      padding:12px 10px;
+      font-weight:bold;
+      cursor:pointer;
+      transition:transform .15s ease, background .25s ease;
+    }
+    .key:hover:not(:disabled) {
+      transform:scale(1.05);
+      background:#00ffaa;
+    }
+    .key:disabled {
+      background:#333;
+      color:#777;
+      cursor:not-allowed;
+      transform:none;
+    }
+
+    .message { min-height:24px; font-size:16px; margin-top:6px; }
+
+    .buttons {
+      display:flex;
+      gap:14px;
+      margin-top:8px;
+    }
+    .btn, .link-btn {
+      background:linear-gradient(135deg, #00ffcc, #0066ff);
+      color:#111;
+      border:none;
+      border-radius:12px;
+      padding:10px 18px;
+      font-weight:bold;
+      text-decoration:none;
+      cursor:pointer;
+      transition:transform .15s ease, background .25s ease;
+    }
+    .btn:hover, .link-btn:hover {
+      transform:scale(1.05);
+      background:linear-gradient(135deg, #00ffaa, #0099ff);
+    }
+
+    /* ========== Responsive tweaks (match your index) ========== */
+    @media (max-width:600px){
+      .search-bar input { width:120px; }
+      .word-display { font-size:20px; gap:8px; }
+      .key { padding:9px 8px; font-size:14px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header copied to match index.html exactly -->
+  <header>
+    <div class="logo">
+      BombForge Webgames
+      <p>Games made for YOU!</p>
+    </div>
+
+    <div class="search-bar">
+      <!-- Magnifying glass icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M10 2a8 8 0 015.292 13.708l4.5 4.5-1.414 1.414-4.5-4.5A8 8 0 1110 2zm0 2a6 6 0 100 12 6 6 0 000-12z"/>
+      </svg>
+      <input type="text" placeholder="Search games...">
+    </div>
+  </header>
+
+  <!-- Game -->
+  <div class="game-area">
+    <h1>Hangman</h1>
+
+    <div class="canvas-wrap">
+      <canvas id="hangmanCanvas" width="220" height="260"></canvas>
+    </div>
+
+    <div class="word-display" id="wordDisplay"></div>
+
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="message" id="message"></div>
+
+    <div class="buttons">
+      <button class="btn" id="retryBtn">Retry</button>
+      <a class="link-btn" href="home.html">Return Home</a>
+    </div>
+  </div>
+
+  <script>
+    /* ===== Word list ===== */
+    const WORDS = [
+      "javascript","python","gaming","bombforge","hangman","webgames","coding",
+      "challenge","victory","puzzle","orange","banana","browser","rocket","dragon",
+      "matrix","castle","socket","object","server","client","widget","algorithm"
+    ];
+
+    /* ===== State ===== */
+    let chosen = "", revealed = [], wrong = 0;
+    const MAX_WRONG = 6;
+
+    /* ===== Elements ===== */
+    const canvas = document.getElementById("hangmanCanvas");
+    const ctx = canvas.getContext("2d");
+    const wordDisplay = document.getElementById("wordDisplay");
+    const kb = document.getElementById("keyboard");
+    const msg = document.getElementById("message");
+    const retryBtn = document.getElementById("retryBtn");
+
+    /* ===== Init / Reset ===== */
+    function initGame(){
+      chosen = WORDS[Math.floor(Math.random()*WORDS.length)].toUpperCase();
+      revealed = Array(chosen.length).fill("");
+      wrong = 0;
+      msg.textContent = "";
+
+      // build underscores
+      wordDisplay.innerHTML = "";
+      for (let i=0;i<chosen.length;i++){
+        const s = document.createElement("div");
+        s.className = "slot";
+        s.textContent = revealed[i] ? revealed[i] : "";
+        wordDisplay.appendChild(s);
+      }
+
+      // build keyboard
+      kb.innerHTML = "";
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(letter=>{
+        const b = document.createElement("button");
+        b.className = "key";
+        b.textContent = letter;
+        b.addEventListener("click", ()=>onGuess(letter, b));
+        kb.appendChild(b);
+      });
+
+      // draw gallows
+      clearCanvas();
+    }
+
+    /* ===== Canvas drawing ===== */
+    function clearCanvas(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+
+      // base + pole + beam + rope
+      ctx.beginPath();
+      ctx.moveTo(20,240); ctx.lineTo(200,240);   // base
+      ctx.moveTo(50,240); ctx.lineTo(50,30);     // pole
+      ctx.lineTo(140,30);                        // beam
+      ctx.lineTo(140,55);                        // rope
+      ctx.stroke();
+    }
+
+    function drawStep(step){
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 3;
+      switch(step){
+        case 1: // head
+          ctx.beginPath();
+          ctx.arc(140, 80, 20, 0, Math.PI*2);
+          ctx.stroke();
+          break;
+        case 2: // body
+          ctx.beginPath();
+          ctx.moveTo(140,100); ctx.lineTo(140,160);
+          ctx.stroke();
+          break;
+        case 3: // left arm
+          ctx.beginPath();
+          ctx.moveTo(140,115); ctx.lineTo(112,135);
+          ctx.stroke();
+          break;
+        case 4: // right arm
+          ctx.beginPath();
+          ctx.moveTo(140,115); ctx.lineTo(168,135);
+          ctx.stroke();
+          break;
+        case 5: // left leg
+          ctx.beginPath();
+          ctx.moveTo(140,160); ctx.lineTo(118,200);
+          ctx.stroke();
+          break;
+        case 6: // right leg
+          ctx.beginPath();
+          ctx.moveTo(140,160); ctx.lineTo(162,200);
+          ctx.stroke();
+          break;
+      }
+    }
+
+    /* ===== Game logic ===== */
+    function onGuess(letter, btn){
+      btn.disabled = true;
+
+      let found = false;
+      for (let i=0;i<chosen.length;i++){
+        if (chosen[i] === letter){
+          revealed[i] = letter;
+          found = true;
+        }
+      }
+
+      // update display
+      const slots = wordDisplay.querySelectorAll(".slot");
+      for (let i=0;i<slots.length;i++){
+        slots[i].textContent = revealed[i];
+      }
+
+      if (!found){
+        wrong++;
+        drawStep(wrong);
+        if (wrong >= MAX_WRONG){
+          endGame(false);
+          return;
+        }
+      } else {
+        // check win
+        if (revealed.join("") === chosen){
+          endGame(true);
+          return;
+        }
+      }
+    }
+
+    function endGame(won){
+      // disable keys
+      kb.querySelectorAll(".key").forEach(k=>k.disabled = true);
+      if (won){
+        msg.textContent = "🎉 You Win!";
+      } else {
+        msg.textContent = "💀 Game Over! Word was: " + chosen;
+      }
+    }
+
+    // Physical keyboard support
+    document.addEventListener("keydown", (e)=>{
+      if (e.key.length !== 1) return;
+      const L = e.key.toUpperCase();
+      if (L < "A" || L > "Z") return;
+      const btn = [...kb.querySelectorAll(".key")].find(b=>b.textContent===L);
+      if (btn && !btn.disabled) onGuess(L, btn);
+    });
+
+    retryBtn.addEventListener("click", initGame);
+
+    // Start
+    initGame();
+  </script>
+</body>
+</html>

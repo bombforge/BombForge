@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tower Tiles - BombForge</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    header {
+      width: 100%;
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      background: #111;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #00ffcc;
+    }
+    .logo p {
+      font-size: 14px;
+      color: #aaa;
+      margin-top: 2px;
+      font-weight: normal;
+    }
+
+    #gameCanvas {
+      background: #222;
+      margin-top: 10px;
+      border-radius: 12px;
+    }
+
+    .info {
+      margin-top: 10px;
+      font-size: 18px;
+    }
+
+    .btns {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      background: linear-gradient(135deg, #00ffcc, #0066ff);
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.25s ease;
+    }
+    button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #00ffaa, #0099ff);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      BombForge Webgames
+      <p>Games made for YOU!</p>
+    </div>
+  </header>
+
+  <canvas id="gameCanvas" width="360" height="600"></canvas>
+  <div class="info">
+    Score: <span id="score">0</span> | Best: <span id="best">0</span>
+  </div>
+  <div class="btns">
+    <button onclick="startGame()">Retry</button>
+    <button onclick="window.location.href='home.html'">Return Home</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score");
+    const bestEl = document.getElementById("best");
+
+    let blocks, currentBlock, speed, score, best, gameOver, direction;
+
+    best = localStorage.getItem("towerBest") || 0;
+    bestEl.textContent = best;
+
+    function startGame() {
+      blocks = [{ x: 60, y: canvas.height - 30, w: 240, color: randomColor() }];
+      score = 0;
+      speed = 2;
+      direction = 1;
+      gameOver = false;
+      spawnBlock();
+      loop();
+    }
+
+    function spawnBlock() {
+      const last = blocks[blocks.length - 1];
+      currentBlock = {
+        x: 0,
+        y: last.y - 30,
+        w: last.w,
+        color: randomColor(),
+      };
+    }
+
+    function placeBlock() {
+      const last = blocks[blocks.length - 1];
+      let overlap = Math.min(
+        last.x + last.w,
+        currentBlock.x + currentBlock.w
+      ) - Math.max(last.x, currentBlock.x);
+
+      if (overlap <= 0) {
+        gameOver = true;
+        return;
+      }
+
+      if (overlap < currentBlock.w) {
+        currentBlock.w = overlap;
+        currentBlock.x =
+          currentBlock.x < last.x ? last.x : currentBlock.x;
+      }
+
+      blocks.push(currentBlock);
+      score++;
+      scoreEl.textContent = score;
+      if (score > best) {
+        best = score;
+        localStorage.setItem("towerBest", best);
+        bestEl.textContent = best;
+      }
+
+      speed += 0.1;
+      spawnBlock();
+    }
+
+    function loop() {
+      if (gameOver) {
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.font = "28px Arial";
+        ctx.fillText("Game Over!", 100, canvas.height / 2);
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Move block
+      currentBlock.x += speed * direction;
+      if (
+        currentBlock.x + currentBlock.w > canvas.width ||
+        currentBlock.x < 0
+      ) {
+        direction *= -1;
+      }
+
+      // Draw placed blocks
+      for (let b of blocks) {
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x, b.y, b.w, 30);
+      }
+
+      // Draw moving block
+      ctx.fillStyle = currentBlock.color;
+      ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, 30);
+
+      requestAnimationFrame(loop);
+    }
+
+    function randomColor() {
+      const colors = ["#00ffcc", "#0066ff", "#ff0066", "#ffaa00", "#66ff00"];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // Controls
+    canvas.addEventListener("click", () => {
+      if (!gameOver) placeBlock();
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && !gameOver) placeBlock();
+    });
+
+    startGame();
+  </script>
+</body>
+</html>

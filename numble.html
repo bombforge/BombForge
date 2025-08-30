@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Numble - BombForge</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background:#111;
+      color:#fff;
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
+
+    /* ===== Header (matches index.html) ===== */
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:15px 20px;
+      position:relative;
+    }
+    .logo {
+      font-size:24px;
+      font-weight:bold;
+      color:#00ffcc;
+    }
+    .logo p {
+      font-size:14px;
+      color:#aaa;
+      margin-top:2px;
+      font-weight:normal;
+    }
+    /* centered search bar like home page */
+    .search-bar {
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      align-items:center;
+      background:#222;
+      border-radius:25px;
+      padding:6px 12px;
+      gap:6px;
+    }
+    .search-bar input {
+      background:transparent;
+      border:none;
+      outline:none;
+      color:#fff;
+      font-size:14px;
+      width:180px;
+    }
+    .search-bar input::placeholder { color:#777; }
+    .search-bar svg { width:18px; height:18px; fill:#aaa; }
+
+    /* ===== Main/Game Layout ===== */
+    main {
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:20px;
+      gap:12px;
+    }
+
+    h2 { font-size:20px; color:#ddd; }
+
+    .topbar {
+      display:flex;
+      align-items:center;
+      gap:16px;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+
+    #streak { font-weight:bold; color:#00ffcc; }
+
+    .toggle {
+      display:flex; align-items:center; gap:8px;
+      background:#1a1a1a; border:1px solid #333; padding:6px 10px; border-radius:10px;
+      font-size:14px; color:#ccc;
+    }
+    .toggle input { accent-color:#00ffcc; width:16px; height:16px; }
+
+    /* Grid (5 columns, 6 rows) */
+    #grid {
+      display:grid;
+      grid-template-columns:repeat(5, 1fr);
+      gap:8px;
+      width:min(90vw, 350px);
+      margin:10px 0 6px;
+    }
+    .cell {
+      aspect-ratio:1/1;
+      border:2px solid #444;
+      background:#222;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:clamp(18px, 5vw, 32px);
+      font-weight:bold;
+      text-transform:uppercase;
+      border-radius:8px;
+      transition:background .25s ease, transform .25s ease;
+    }
+    .cell.correct { background:#538d4e; border-color:#538d4e; color:#fff; }
+    .cell.present { background:#b59f3b; border-color:#b59f3b; color:#fff; }
+    .cell.absent  { background:#3a3a3c; border-color:#3a3a3c; color:#fff; }
+
+    .flip { transform:rotateX(90deg); }
+
+    /* On-screen number keyboard */
+    .keyboard { display:flex; flex-direction:column; gap:6px; align-items:center; }
+    .key-row { display:flex; gap:4px; justify-content:center; flex-wrap:wrap; }
+    .key {
+      padding:10px 8px;
+      min-width:34px;
+      border:none;
+      border-radius:6px;
+      background:#444;
+      color:#fff;
+      font-weight:bold;
+      text-transform:uppercase;
+      cursor:pointer;
+      transition:background .15s ease;
+      user-select:none;
+      font-size:16px;
+    }
+    .key:hover { background:#555; }
+    .key.correct { background:#538d4e; }
+    .key.present { background:#b59f3b; }
+    .key.absent  { background:#3a3a3c; }
+
+    #message { min-height:22px; text-align:center; color:#ddd; }
+
+    /* Always-visible Return Home link */
+    .always-home { margin-top:8px; }
+    .always-home a {
+      color:#00ffcc;
+      text-decoration:none;
+      font-weight:bold;
+    }
+
+    /* End-of-game actions */
+    #actions {
+      display:none; /* shown at game end */
+      margin-top:16px;
+      display:flex;
+      gap:10px;
+      justify-content:center;
+    }
+    .btn {
+      padding:10px 16px;
+      border:none;
+      border-radius:8px;
+      font-weight:bold;
+      cursor:pointer;
+      background:linear-gradient(135deg, #00ffcc, #0066ff);
+      color:black;
+    }
+    .btn:hover { background:linear-gradient(135deg, #00ffaa, #0099ff); }
+    .link-btn {
+      display:inline-block;
+      padding:10px 16px;
+      border-radius:8px;
+      font-weight:bold;
+      text-decoration:none;
+      background:linear-gradient(135deg, #00ffcc, #0066ff);
+      color:black;
+    }
+    .link-btn:hover { background:linear-gradient(135deg, #00ffaa, #0099ff); }
+
+    @media (max-width:600px){
+      .search-bar input { width:120px; }
+      .key { padding:8px 6px; font-size:14px; min-width:30px; }
+      #grid { width:min(95vw, 320px); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header (exactly like index.html) -->
+  <header>
+    <div class="logo">
+      BombForge Webgames
+      <p>Games made for YOU!</p>
+    </div>
+    <div class="search-bar">
+      <!-- Magnifying glass icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M10 2a8 8 0 015.292 13.708l4.5 4.5-1.414 1.414-4.5-4.5A8 8 0 1110 2zm0 2a6 6 0 100 12 6 6 0 000-12z"/>
+      </svg>
+      <input type="text" placeholder="Search games...">
+    </div>
+  </header>
+
+  <main>
+    <h2>Numble</h2>
+
+    <div class="topbar">
+      <div id="streak">Streak: 0</div>
+      <label class="toggle" title="If on, the secret number uses all different digits">
+        <input type="checkbox" id="noRepeatsToggle">
+        No Repeats
+      </label>
+    </div>
+
+    <div id="grid"></div>
+
+    <!-- On-screen number keyboard -->
+    <div class="keyboard" id="keyboard">
+      <div class="key-row" id="row1"></div>
+      <div class="key-row" id="row2"></div>
+      <div class="key-row" id="row3"></div>
+    </div>
+
+    <div id="message"></div>
+
+    <div class="always-home">
+      <a href="home.html">← Return Home</a>
+    </div>
+
+    <div id="actions">
+      <button class="btn" id="retryBtn">Retry</button>
+      <a class="link-btn" href="home.html">Home</a>
+    </div>
+  </main>
+
+  <script>
+    /* =============================
+       Numble (Math Wordle) Script
+       ============================= */
+
+    // ----- Config -----
+    const rows = 6;      // attempts
+    const cols = 5;      // digits
+
+    // ----- State -----
+    let answer = "";           // secret 5-digit string (may include leading zeros)
+    let guesses = [];          // 2D array [rows][cols] of chars
+    let currentRow = 0;
+    let currentCol = 0;
+    let gameOver = false;
+    let streak = 0;            // persisted in localStorage across sessions
+
+    // ----- Elements -----
+    const grid = document.getElementById("grid");
+    const message = document.getElementById("message");
+    const actions = document.getElementById("actions");
+    const streakDisplay = document.getElementById("streak");
+    const noRepeatsToggle = document.getElementById("noRepeatsToggle");
+
+    // Load streak from localStorage if present
+    try {
+      const saved = localStorage.getItem("numble_streak");
+      if (saved !== null) streak = parseInt(saved, 10) || 0;
+    } catch {}
+    updateStreak();
+
+    // ----- Build grid ONCE (never rebuild to avoid DOM reference bugs) -----
+    for (let i=0; i<rows*cols; i++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      grid.appendChild(cell);
+    }
+    function cells() { return document.querySelectorAll(".cell"); }
+
+    // ----- Build keypad -----
+    // Layout: row1: 1 2 3 4 5   row2: 6 7 8 9 0   row3: Enter Backspace
+    const row1 = ["1","2","3","4","5"];
+    const row2 = ["6","7","8","9","0"];
+    const row3 = ["enter","backspace"];
+
+    function mkKey(k) {
+      const b = document.createElement("button");
+      b.className = "key";
+      b.dataset.key = k;
+      b.textContent = (k==="backspace" ? "⌫" : (k==="enter" ? "Enter" : k));
+      b.addEventListener("click", ()=>{ if (!gameOver) handleKey(k); });
+      return b;
+    }
+    document.getElementById("row1").append(...row1.map(mkKey));
+    document.getElementById("row2").append(...row2.map(mkKey));
+    document.getElementById("row3").append(...row3.map(mkKey));
+
+    // ----- Utilities -----
+    function setMessage(t) { message.textContent = t; }
+    function updateStreak() { streakDisplay.textContent = "Streak: " + streak; }
+    function getKeyBtn(ch) { return document.querySelector(`.key[data-key='${ch}']`); }
+
+    function updateGrid() {
+      const c = cells();
+      for (let r=0; r<rows; r++) {
+        for (let col=0; col<cols; col++) {
+          const idx = r*cols + col;
+          c[idx].textContent = guesses[r][col] || "";
+        }
+      }
+    }
+
+    // ----- Answer generation -----
+    function randomDigit() {
+      return Math.floor(Math.random()*10).toString();
+    }
+    function makeAnswer(noRepeats=false) {
+      if (!noRepeats) {
+        // allow repeats, include leading zeros
+        let s = "";
+        for (let i=0;i<cols;i++) s += randomDigit();
+        return s;
+      } else {
+        // unique digits; if needing 5 unique digits (0-9)
+        const digits = ["0","1","2","3","4","5","6","7","8","9"];
+        // ensure the first digit can still be zero (we allow leading zero)
+        // shuffle
+        for (let i=digits.length-1;i>0;i--){
+          const j = Math.floor(Math.random()*(i+1));
+          [digits[i], digits[j]] = [digits[j], digits[i]];
+        }
+        return digits.slice(0, cols).join("");
+      }
+    }
+
+    // ----- Input handling -----
+    function inputDigit(d) {
+      if (currentCol < cols && currentRow < rows) {
+        guesses[currentRow][currentCol] = d;
+        currentCol++;
+        updateGrid();
+      }
+    }
+    function backspace() {
+      if (currentCol > 0) {
+        currentCol--;
+        guesses[currentRow][currentCol] = "";
+        updateGrid();
+      }
+    }
+    function handleKey(k) {
+      if (k === "enter") submitGuess();
+      else if (k === "backspace") backspace();
+      else if (/^[0-9]$/.test(k)) inputDigit(k);
+    }
+
+    // Physical keyboard
+    document.addEventListener("keydown", (e)=>{
+      if (gameOver) return;
+      if (e.key === "Enter") handleKey("enter");
+      else if (e.key === "Backspace") handleKey("backspace");
+      else if (/^[0-9]$/.test(e.key)) handleKey(e.key);
+    });
+
+    // ----- Scoring (digit counts like Wordle letters) -----
+    // returns array of "correct" | "present" | "absent"
+    function scoreGuess(guess, ans) {
+      const res = Array(cols).fill("absent");
+      const ansArr = ans.split("");
+      const gArr = guess.split("");
+
+      const counts = {};
+      for (let ch of ansArr) counts[ch] = (counts[ch]||0)+1;
+
+      // correct
+      for (let i=0;i<cols;i++){
+        if (gArr[i] === ansArr[i]) {
+          res[i] = "correct";
+          counts[gArr[i]]--;
+        }
+      }
+      // present
+      for (let i=0;i<cols;i++){
+        if (res[i] === "correct") continue;
+        const ch = gArr[i];
+        if (counts[ch] > 0) {
+          res[i] = "present";
+          counts[ch]--;
+        }
+      }
+      return res;
+    }
+
+    function colorRow(rowIndex, guess, marks) {
+      const c = cells();
+      for (let i=0;i<cols;i++){
+        const cell = c[rowIndex*cols + i];
+        cell.classList.add("flip");
+        setTimeout(()=>{
+          cell.classList.remove("flip");
+          cell.classList.add(marks[i]); // correct/present/absent
+
+          // update keypad state with strongest status
+          const k = getKeyBtn(guess[i]);
+          if (k) {
+            if (marks[i] === "correct") {
+              k.classList.remove("present","absent");
+              k.classList.add("correct");
+            } else if (marks[i] === "present") {
+              if (!k.classList.contains("correct")) {
+                k.classList.remove("absent");
+                k.classList.add("present");
+              }
+            } else { // absent
+              if (!k.classList.contains("correct") && !k.classList.contains("present")) {
+                k.classList.add("absent");
+              }
+            }
+          }
+        }, 120 + i*80);
+      }
+    }
+
+    // ----- Submit guess -----
+    function submitGuess() {
+      if (currentCol < cols) { setMessage("Enter 5 digits."); return; }
+      const guess = guesses[currentRow].join("");
+      const marks = scoreGuess(guess, answer);
+      colorRow(currentRow, guess, marks);
+
+      if (guess === answer) {
+        setMessage("Nice! You got it: " + answer);
+        streak++;
+        persistStreak();
+        updateStreak();
+        gameOver = true;
+        actions.style.display = "flex";
+        return;
+      }
+
+      currentRow++;
+      currentCol = 0;
+
+      if (currentRow === rows) {
+        setMessage("Game Over! Number was: " + answer);
+        streak = 0;
+        persistStreak();
+        updateStreak();
+        gameOver = true;
+        actions.style.display = "flex";
+      } else {
+        setMessage("");
+      }
+    }
+
+    function persistStreak() {
+      try { localStorage.setItem("numble_streak", String(streak)); } catch {}
+    }
+
+    // ----- Retry / New game -----
+    document.getElementById("retryBtn").addEventListener("click", startNewGame);
+
+    function startNewGame() {
+      guesses = Array(rows).fill(0).map(()=>Array(cols).fill(""));
+      currentRow = 0;
+      currentCol = 0;
+      gameOver = false;
+      answer = makeAnswer(noRepeatsToggle.checked);
+
+      // reset grid content + classes (DON'T rebuild DOM)
+      const c = cells();
+      c.forEach(cell=>{
+        cell.textContent = "";
+        cell.className = "cell";
+      });
+
+      // reset keypad colors
+      document.querySelectorAll(".key").forEach(k=>k.classList.remove("correct","present","absent"));
+
+      actions.style.display = "none";
+      setMessage("");
+      updateGrid();
+    }
+
+    // If the user flips the toggle mid-game, only affect the next game
+    noRepeatsToggle.addEventListener("change", ()=>{
+      // optional: give a hint that it applies on next game
+      setMessage(noRepeatsToggle.checked ? "No Repeats: ON (applies next game)" : "No Repeats: OFF (applies next game)");
+      setTimeout(()=>{ if (!gameOver) setMessage(""); }, 1200);
+    });
+
+    // ----- Init -----
+    startNewGame();
+  </script>
+</body>
+</html>

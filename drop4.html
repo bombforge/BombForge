@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Drop4 - BombForge</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background:#111;
+      color:#fff;
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
+
+    /* ===== Header (like index.html) ===== */
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:15px 20px;
+      position:relative;
+    }
+    .logo {
+      font-size:24px;
+      font-weight:bold;
+      color:#00ffcc;
+    }
+    .logo p {
+      font-size:14px;
+      color:#aaa;
+      margin-top:2px;
+      font-weight:normal;
+    }
+    .search-bar {
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      align-items:center;
+      background:#222;
+      border-radius:25px;
+      padding:6px 12px;
+      gap:6px;
+    }
+    .search-bar input {
+      background:transparent;
+      border:none;
+      outline:none;
+      color:#fff;
+      font-size:14px;
+      width:180px;
+    }
+    .search-bar input::placeholder { color:#777; }
+    .search-bar svg { width:18px; height:18px; fill:#aaa; }
+
+    /* ===== Main ===== */
+    main {
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:20px;
+      gap:12px;
+    }
+    h2 { font-size:20px; color:#ddd; }
+
+    #turnDisplay {
+      font-weight:bold;
+      margin-bottom:10px;
+      color:#00ffcc;
+    }
+
+    /* Board */
+    #board {
+      display:grid;
+      grid-template-columns: repeat(7, 60px);
+      grid-template-rows: repeat(6, 60px);
+      gap:5px;
+      background:#0066ff;
+      padding:10px;
+      border-radius:12px;
+      position:relative;
+      overflow:hidden;
+    }
+    .cell {
+      width:60px;
+      height:60px;
+      background:#222;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:24px;
+      cursor:pointer;
+    }
+    .red { background:red !important; }
+    .yellow { background:gold !important; }
+
+    /* Animated falling disc */
+    .disc {
+      width:60px;
+      height:60px;
+      border-radius:50%;
+      position:absolute;
+      left:0;
+      top:0;
+      z-index:10;
+      pointer-events:none;
+    }
+    .disc.red { background:red; }
+    .disc.yellow { background:gold; }
+
+    /* Actions */
+    #actions {
+      margin-top:16px;
+      display:none;
+      gap:10px;
+      justify-content:center;
+    }
+    .btn {
+      padding:10px 16px;
+      border:none;
+      border-radius:8px;
+      font-weight:bold;
+      cursor:pointer;
+      background:linear-gradient(135deg, #00ffcc, #0066ff);
+      color:black;
+    }
+    .btn:hover { background:linear-gradient(135deg, #00ffaa, #0099ff); }
+
+    .link-btn {
+      display:inline-block;
+      padding:10px 16px;
+      border-radius:8px;
+      font-weight:bold;
+      text-decoration:none;
+      background:linear-gradient(135deg, #00ffcc, #0066ff);
+      color:black;
+    }
+    .link-btn:hover { background:linear-gradient(135deg, #00ffaa, #0099ff); }
+
+    /* Return home */
+    .always-home { margin-top:8px; }
+    .always-home a {
+      color:#00ffcc;
+      text-decoration:none;
+      font-weight:bold;
+    }
+
+    @media (max-width:600px){
+      #board {
+        grid-template-columns: repeat(7, 40px);
+        grid-template-rows: repeat(6, 40px);
+        gap:4px;
+        padding:6px;
+      }
+      .cell { width:40px; height:40px; }
+      .disc { width:40px; height:40px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      BombForge Webgames
+      <p>Games made for YOU!</p>
+    </div>
+    <div class="search-bar">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M10 2a8 8 0 015.292 13.708l4.5 4.5-1.414 1.414-4.5-4.5A8 8 0 1110 2zm0 2a6 6 0 100 12 6 6 0 000-12z"/>
+      </svg>
+      <input type="text" placeholder="Search games...">
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main>
+    <h2>Drop4</h2>
+    <div id="turnDisplay">Red's Turn</div>
+
+    <div id="board"></div>
+
+    <div id="message"></div>
+
+    <div class="always-home">
+      <a href="home.html">← Return Home</a>
+    </div>
+
+    <div id="actions">
+      <button class="btn" id="retryBtn">Play Again</button>
+      <a class="link-btn" href="home.html">Home</a>
+    </div>
+  </main>
+
+  <script>
+    const rows = 6;
+    const cols = 7;
+    let board = [];
+    let currentPlayer = "red";
+    let gameOver = false;
+
+    const boardDiv = document.getElementById("board");
+    const turnDisplay = document.getElementById("turnDisplay");
+    const message = document.getElementById("message");
+    const actions = document.getElementById("actions");
+
+    function initBoard() {
+      board = Array(rows).fill().map(()=>Array(cols).fill(null));
+      boardDiv.innerHTML = "";
+      for (let r=0; r<rows; r++) {
+        for (let c=0; c<cols; c++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.addEventListener("click", ()=>handleMove(c));
+          boardDiv.appendChild(cell);
+        }
+      }
+      gameOver = false;
+      currentPlayer = "red";
+      turnDisplay.textContent = "Red's Turn";
+      message.textContent = "";
+      actions.style.display = "none";
+    }
+
+    function handleMove(col) {
+      if (gameOver) return;
+      let rowToFill = null;
+      for (let r=rows-1; r>=0; r--) {
+        if (!board[r][col]) {
+          rowToFill = r;
+          break;
+        }
+      }
+      if (rowToFill === null) return; // column full
+
+      // Animate falling disc
+      const disc = document.createElement("div");
+      disc.classList.add("disc", currentPlayer);
+
+      const cellWidth = boardDiv.querySelector(".cell").offsetWidth + 5; // including gap
+      const cellHeight = boardDiv.querySelector(".cell").offsetHeight + 5;
+      disc.style.left = (col * cellWidth) + "px";
+      disc.style.top = "0px";
+
+      boardDiv.appendChild(disc);
+
+      let pos = 0;
+      const target = rowToFill * cellHeight;
+      const speed = 10; // px per frame
+
+      function fall() {
+        if (pos < target) {
+          pos += speed;
+          if (pos > target) pos = target;
+          disc.style.top = pos + "px";
+          requestAnimationFrame(fall);
+        } else {
+          // landed
+          boardDiv.removeChild(disc);
+          board[rowToFill][col] = currentPlayer;
+          const cell = getCell(rowToFill, col);
+          cell.classList.add(currentPlayer);
+
+          if (checkWin(rowToFill,col)) {
+            message.textContent = (currentPlayer==="red" ? "Red" : "Yellow") + " Wins!";
+            gameOver = true;
+            actions.style.display = "flex";
+            return;
+          }
+          if (board.flat().every(x=>x!==null)) {
+            message.textContent = "It's a draw!";
+            gameOver = true;
+            actions.style.display = "flex";
+            return;
+          }
+          currentPlayer = currentPlayer==="red" ? "yellow" : "red";
+          turnDisplay.textContent = currentPlayer==="red" ? "Red's Turn" : "Yellow's Turn";
+        }
+      }
+      requestAnimationFrame(fall);
+    }
+
+    function getCell(r,c) {
+      return boardDiv.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+    }
+
+    function checkWin(r,c) {
+      return checkDir(r,c,1,0) || checkDir(r,c,0,1) ||
+             checkDir(r,c,1,1) || checkDir(r,c,1,-1);
+    }
+
+    function checkDir(r,c,dr,dc) {
+      let count=1;
+      count+=countDir(r,c,dr,dc);
+      count+=countDir(r,c,-dr,-dc);
+      return count>=4;
+    }
+
+    function countDir(r,c,dr,dc) {
+      let rr=r+dr, cc=c+dc, cnt=0;
+      while(rr>=0 && rr<rows && cc>=0 && cc<cols && board[rr][cc]===currentPlayer) {
+        cnt++;
+        rr+=dr; cc+=dc;
+      }
+      return cnt;
+    }
+
+    document.getElementById("retryBtn").addEventListener("click", initBoard);
+
+    initBoard();
+  </script>
+</body>
+</html>
